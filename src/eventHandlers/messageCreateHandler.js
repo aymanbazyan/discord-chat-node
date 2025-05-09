@@ -56,7 +56,7 @@ module.exports = {
       config.IGNORE_PREFIX &&
       userMessageContentLower.startsWith(config.IGNORE_PREFIX.toLowerCase())
     ) {
-      logger.log(
+      logger.debug(
         `Ignoring message with prefix "${config.IGNORE_PREFIX}" from ${message.author.tag}`
       );
       return;
@@ -81,7 +81,7 @@ module.exports = {
 
     // Cooldown check (after prefix and command checks)
     if (userCooldowns.has(message.author.id)) {
-      logger.log(`User ${message.author.tag} is on cooldown.`);
+      logger.debug(`User ${message.author.tag} is on cooldown.`);
       // Optionally send a message, or just silently ignore.
       // await message.reply("Please wait a moment before sending another message.");
       return;
@@ -124,14 +124,15 @@ module.exports = {
             `Sending image ${attachment.name} to AI service for description.`
           );
           const description = await aiServiceProvider.describeImage(
-            base64Image
+            base64Image,
+            config.IMAGE_READER_PROMPT
           );
 
           if (description) {
             imageDescriptions.push(
-              `[Image Description for ${attachment.name}]: ${description}`
+              `[Image Description for file]: ${description}`
             );
-            logger.log(`Successfully described image: ${attachment.name}`);
+            logger.debug(`Successfully described image: ${attachment.name}`);
           } else {
             imageDescriptions.push(
               `[Image Description for ${attachment.name}]: Could not generate description.`
@@ -147,7 +148,7 @@ module.exports = {
           );
         }
       }
-      logger.log(
+      logger.debug(
         `Finished processing images. Found ${imageDescriptions.length} descriptions.`
       );
     }
@@ -169,7 +170,7 @@ module.exports = {
           .toLowerCase()
           .startsWith(config.BOT_PREFIX.toLowerCase())
       ) {
-        logger.log(
+        logger.debug(
           `Message from ${message.author.tag} was just prefix or unprocessable. Replying with "Hmm?".`
         );
         await message.reply("Hmm? Did you want to tell me something?");
@@ -304,7 +305,16 @@ module.exports = {
           config.MESSAGE_CHUNK_SIZE
         );
         for (const chunk of chunks) {
-          await message.channel.send(chunk);
+          let processedChunk = chunk;
+
+          // Check if emojis are not allowed
+          if (config.ALLOW_EMOJIS === false) {
+            // Filter emojis from the chunk
+            processedChunk = messageUtils.filterEmojis(chunk);
+          }
+
+          // Send the processed chunk (either original or filtered)
+          await message.channel.send(processedChunk);
         }
         if (i < messageParts.length - 1 && config.MESSAGE_SPLIT_DELAY_MS > 0) {
           await new Promise((resolve) =>

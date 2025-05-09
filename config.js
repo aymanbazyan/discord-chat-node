@@ -32,6 +32,7 @@ const config = {
   GEMINI_SYSTEM_INSTRUCTION: process.env.GEMINI_SYSTEM_INSTRUCTION,
 
   // Bot Behavior
+  ALLOW_EMOJIS: (process.env.ALLOW_EMOJIS || "false") === "true",
   MESSAGE_CHUNK_SIZE: parseInt(process.env.MESSAGE_CHUNK_SIZE || "1900", 10),
   COOLDOWN_TIME: parseInt(process.env.COOLDOWN_TIME || "2000", 10), // Milliseconds
   MAX_HISTORY_SIZE: parseInt(process.env.MAX_HISTORY_SIZE || "20", 10), // -1 unlimited, 0 one-shot

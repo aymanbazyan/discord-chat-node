@@ -313,7 +313,12 @@ const describeImage = async (
     // A more robust solution would inspect image headers or require mimeType.
     const imagePart = fileToGenerativePart(imageBuffer, "image/png"); // Assuming PNG, adjust if needed
 
-    const contents = [{ role: "user", parts: [{ text: prompt }, imagePart] }];
+    const contents = [
+      {
+        role: "user",
+        parts: [{ text: config.IMAGE_READER_PROMPT }, imagePart],
+      },
+    ];
 
     logger.debug(
       `Sending image and prompt to Gemini Vision model (${

@@ -4,6 +4,16 @@
 const config = require("../../config"); // Adjust path
 const logger = require("../logger"); // Adjust path
 
+// Function to filter out emojis from a string
+function filterEmojis(text) {
+  // This regex attempts to match common emoji patterns.
+  // It might not catch all emojis, as the Unicode standard is vast and evolving.
+  // A more comprehensive solution might involve a dedicated library.
+  const emojiRegex =
+    /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udeff]|\ud83d[\ud000-\udeff]|\ud83e[\ud000-\udeff])/g;
+  return text.replace(emojiRegex, "");
+}
+
 /**
  * Splits a long message into chunks that respect Discord's character limit.
  * Attempts to split by natural separators (newlines, sentences) first.
@@ -114,4 +124,5 @@ function escapeRegExp(string) {
 module.exports = {
   splitMessage,
   escapeRegExp,
+  filterEmojis,
 };
