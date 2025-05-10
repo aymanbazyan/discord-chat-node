@@ -8,6 +8,9 @@ const config = {
   // Discord Configuration
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
   TARGET_CHANNEL_ID: process.env.TARGET_CHANNEL_ID, // Optional: Bot listens in this channel
+  ALLOW_PRIVATE_MESSAGES:
+    (process.env.ALLOW_PRIVATE_MESSAGES || "false") === "true",
+
   BOT_PREFIX: process.env.BOT_PREFIX || "", // Optional: Prefix for AI responses
   IGNORE_PREFIX: process.env.IGNORE_PREFIX || "!ignore", // Optional: Prefix to ignore messages
   COMMAND_PREFIX: process.env.COMMAND_PREFIX || "!ollama", // Prefix for utility commands

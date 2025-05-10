@@ -25,6 +25,18 @@ module.exports = {
       return;
     }
 
+    // Check if message is a DM and if DMs are allowed
+    const isDM = message.channel.type === 1;
+    if (
+      isDM &&
+      (!config.ALLOW_PRIVATE_MESSAGES || config.ALLOW_PRIVATE_MESSAGES !== true)
+    ) {
+      logger.debug(
+        `Ignoring direct message from ${message.author.tag} - DMs are disabled.`
+      );
+      return;
+    }
+
     // --- 1. Command Handling ---
     // Give command handler a chance to process the message first.
     // If it's a command, it will be handled, and we can return.
@@ -41,12 +53,17 @@ module.exports = {
     }
 
     // --- 2. AI Response Pre-checks ---
-    const channelId = message.channel.id;
+    const channelId = isDM ? `dm_${message.author.id}` : message.channel.id;
     const rawMessageContent = message.content.trim();
     const userMessageContentLower = rawMessageContent.toLowerCase();
 
     // Ignore messages not in the target channel (if set)
-    if (config.TARGET_CHANNEL_ID && channelId !== config.TARGET_CHANNEL_ID) {
+    // Skip this check for DMs as they have their own channel IDs
+    if (
+      !isDM &&
+      config.TARGET_CHANNEL_ID &&
+      channelId !== config.TARGET_CHANNEL_ID
+    ) {
       logger.debug(`Ignoring message in non-target channel ${channelId}.`);
       return;
     }
@@ -65,7 +82,9 @@ module.exports = {
     let processedMessageContent = rawMessageContent;
 
     // Apply bot prefix filter (if a prefix is set for AI triggering)
-    if (config.BOT_PREFIX) {
+    // For DMs, we can optionally bypass the BOT_PREFIX requirement if configured
+    const requiresPrefixInDM = config.REQUIRE_PREFIX_IN_DM !== false;
+    if (config.BOT_PREFIX && (!isDM || (isDM && requiresPrefixInDM))) {
       if (
         !userMessageContentLower.startsWith(config.BOT_PREFIX.toLowerCase())
       ) {
@@ -194,6 +213,11 @@ module.exports = {
         const senderUsername =
           message.author.globalName || message.author.username;
         userMessageForHistory = `${senderUsername}: ${userMessageForHistory}`;
+      }
+
+      // Add DM context if applicable
+      if (isDM && config.INCLUDE_DM_CONTEXT) {
+        userMessageForHistory = `[Direct Message] ${userMessageForHistory}`;
       }
 
       // Prepare messages for AI Service

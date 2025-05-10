@@ -1,15 +1,24 @@
 // src/discordClient.js
 // Sets up and exports the Discord client instance.
 
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits, Partials } = require("discord.js");
 const config = require("../config");
 const logger = require("./logger");
 
+// Initialize Discord client with necessary intents AND partials
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // Ensure this is enabled in Discord Developer Portal
+    GatewayIntentBits.MessageContent, // Needed to read message content
+    GatewayIntentBits.DirectMessages, // This is essential for DMs
+    GatewayIntentBits.DirectMessageReactions,
+    GatewayIntentBits.DirectMessageTyping,
+  ],
+  partials: [
+    Partials.Channel, // Required for DM channels
+    Partials.Message, // If you need to handle partial messages
+    Partials.User, // Required to receive DMs from users
   ],
 });
 

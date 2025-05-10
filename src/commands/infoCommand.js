@@ -62,6 +62,8 @@ Max History Size:      ${
         : config.MAX_HISTORY_SIZE
     }
 Multiple Chatters:     ${config.MULTIPLE_CHATTERS}
+ALLOW EMOJIS:     ${config.AI_SERVICE}
+ALLOW PRIVATE MESSAGES:     ${config.ALLOW_PRIVATE_MESSAGES}
 System Prompt Set:     ${
       (config.AI_SERVICE === "OLLAMA" && config.OLLAMA_SYSTEM_PROMPT) ||
       (config.AI_SERVICE === "GEMINI" && "N/A (configure per call)")
