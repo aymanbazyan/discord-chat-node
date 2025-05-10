@@ -48,7 +48,7 @@ const handleCommand = async (message) => {
     } catch (error) {
       logger.error(`Error executing command ${commandName}:`, error);
       await message.reply({
-        content: "Oops! Something went wrong while trying to run that command.",
+        content: "Oops! I think you must fix that command.",
       });
       return true; // Attempted to process a command, even if it failed
     }
