@@ -253,7 +253,9 @@ module.exports = {
       logger.debug(
         `Sending ${messagesForOllama.length} message segments to AI service.`
       );
-      const aiResponseContent = await aiServiceProvider.chat(messagesForOllama);
+      const aiResponseContent = (
+        await aiServiceProvider.chat(messagesForOllama)
+      ).replaceAll("\n\n", config.MESSAGE_SPLIT_TOKEN);
 
       if (!aiResponseContent || aiResponseContent.trim() === "") {
         logger.warn(

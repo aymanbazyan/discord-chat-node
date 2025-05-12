@@ -58,25 +58,6 @@ const initialize = () => {
       `Gemini chat client initialized with model: ${config.GEMINI_MODEL}`
     );
 
-    // Optionally initialize a vision model if a specific one is needed or configured
-    // For multimodal prompts (text and image), gemini-pro-vision or newer models like 1.5 flash handle it.
-    // If your config.GEMINI_MODEL is already a vision model, geminiChatModel can be used for describeImage too.
-    if (
-      config.GEMINI_MODEL.includes("vision") ||
-      config.GEMINI_MODEL.startsWith("gemini-1.5") ||
-      config.GEMINI_MODEL.startsWith("gemini-2.0")
-    ) {
-      // e.g. gemini-pro-vision, gemini-1.5-pro-latest, gemini-1.5-flash-latest
-      logger.log(
-        `Gemini model ${config.GEMINI_MODEL} is vision-capable. Will use for image descriptions.`
-      );
-    } else {
-      // If you have a separate model specifically for vision, configure and initialize it here.
-      // For simplicity, we'll assume the main GEMINI_MODEL can handle vision if it's a vision model.
-      logger.warn(
-        `Gemini model ${config.GEMINI_MODEL} might not be optimized for image input. Consider using a vision model (e.g., gemini-pro-vision, gemini-1.5-flash-latest) for describeImage.`
-      );
-    }
     geminiVisionModel = geminiChatModel; // Use the same model if it's vision-capable
 
     return true;
