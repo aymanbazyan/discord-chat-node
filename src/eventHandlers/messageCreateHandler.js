@@ -68,6 +68,14 @@ module.exports = {
       return;
     }
 
+    if (
+      isDM &&
+      config.ONLY_THESE_DM_CHATS &&
+      !config.ONLY_THESE_DM_CHATS.some((c) => channelId.includes(c))
+    ) {
+      return await message.reply("no");
+    }
+
     // Apply ignore prefix filter
     if (
       config.IGNORE_PREFIX &&
