@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Chat Viewer</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        #uploadContainer {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #chatList {
+            margin-top: 20px;
+        }
+        .chat-item {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            overflow: hidden; /* Prevents content from spilling out before animation */
+        }
+        .chat-header {
+            padding: 15px;
+            background-color: #e9e9e9;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-header:hover {
+            background-color: #dcdcdc;
+        }
+        .chat-header .indicator {
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+        }
+        .chat-header.expanded .indicator {
+            transform: rotate(90deg);
+        }
+        .messages-container {
+            padding: 0 15px; /* Padding applied only when expanded */
+            max-height: 0;
+            overflow-y: auto; /* Changed to auto for scrollbar when needed */
+            transition: max-height 0.5s ease-out, padding 0.5s ease-out;
+        }
+        .chat-item.expanded .messages-container {
+            max-height: 600px; /* Adjust as needed, allows scroll */
+            padding: 15px;
+        }
+        .message {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            white-space: pre-wrap; /* Preserve newlines and spaces */
+            word-wrap: break-word; /* Break long words */
+        }
+        .message .role {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        .message .timestamp {
+            font-size: 0.8em;
+            color: #777;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .message.user {
+            background-color: #e1f5fe; /* Light blue */
+            border-left: 4px solid #03a9f4;
+            margin-left: 20px; /* Indent user messages */
+        }
+        .message.assistant {
+            background-color: #f1f8e9; /* Light green */
+            border-left: 4px solid #8bc34a;
+        }
+        #errorDisplay {
+            color: red;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>JSON Chat Viewer</h1>
+
+    <div id="uploadContainer">
+        <label for="fileInput">Upload your JSON chat file:</label>
+        <input type="file" id="fileInput" accept=".json">
+        <div id="errorDisplay"></div>
+    </div>
+
+    <div id="chatList">
+        <!-- Chats will be rendered here -->
+    </div>
+
+
+<script>
+        const fileInput = document.getElementById('fileInput');
+        const chatListDiv = document.getElementById('chatList');
+        const errorDisplay = document.getElementById('errorDisplay');
+
+        fileInput.addEventListener('change', handleFileUpload);
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            chatListDiv.innerHTML = ''; // Clear previous results
+            errorDisplay.textContent = ''; // Clear previous errors
+
+            if (!file) {
+                errorDisplay.textContent = 'No file selected.';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const fileContent = e.target.result;
+                    if (!fileContent) {
+                        errorDisplay.textContent = 'File is empty.';
+                        return;
+                    }
+                    console.log("Raw file content:", fileContent.substring(0, 500) + (fileContent.length > 500 ? "..." : "")); // Log first 500 chars
+                    const jsonData = JSON.parse(fileContent);
+                    console.log("Parsed JSON Data:", jsonData);
+                    renderChats(jsonData);
+                } catch (error) {
+                    console.error("Error processing file:", error);
+                    errorDisplay.textContent = `Error: Invalid JSON file. Check console (F12) for details. Message: ${error.message}`;
+                    chatListDiv.innerHTML = '';
+                }
+            };
+            reader.onerror = function(e) {
+                console.error("FileReader error:", e);
+                errorDisplay.textContent = 'Error reading file.';
+                chatListDiv.innerHTML = '';
+            }
+            reader.readAsText(file);
+        }
+
+        function renderChats(chatsData) {
+            console.log("renderChats called with:", chatsData);
+            chatListDiv.innerHTML = ''; // Clear previous chats
+
+            if (!chatsData || typeof chatsData !== 'object' || Array.isArray(chatsData) || chatsData === null) {
+                console.error("chatsData is not a valid root object:", chatsData);
+                errorDisplay.textContent = 'Error: Loaded data is not in the expected format (should be an object mapping chat IDs to message arrays).';
+                chatListDiv.innerHTML = '<p>No chats found or data is in an unexpected format.</p>';
+                return;
+            }
+
+            const chatIds = Object.keys(chatsData);
+            if (chatIds.length === 0) {
+                chatListDiv.innerHTML = '<p>No chats found in the uploaded file (JSON object is empty).</p>';
+                return;
+            }
+
+            for (const chatId of chatIds) { // Use of for...of with Object.keys for clarity
+                console.log("Processing Chat ID:", chatId);
+                const messages = chatsData[chatId];
+
+                if (!Array.isArray(messages)) {
+                    console.warn(`Data for chat ID "${chatId}" is not an array of messages:`, messages);
+                    const errorMsgDiv = document.createElement('div');
+                    errorMsgDiv.style.color = 'orange';
+                    // Using textContent, so HTML escaping is handled by the browser
+                    errorMsgDiv.textContent = `Skipping Chat ID "${chatId.toString()}": Expected an array of messages but found ${typeof messages}.`;
+                    chatListDiv.appendChild(errorMsgDiv);
+                    continue; // Skip this chat if its messages aren't an array
+                }
+                console.log(`Messages for chat "${chatId}":`, messages);
+
+
+                const chatItemDiv = document.createElement('div');
+                chatItemDiv.className = 'chat-item';
+
+                const chatHeaderDiv = document.createElement('div');
+                chatHeaderDiv.className = 'chat-header';
+                // WARNING: XSS VULNERABILITY if chatId contains HTML/script
+                chatHeaderDiv.innerHTML = `
+                    <span>Chat ID: ${chatId} (${messages.length} messages)</span>
+                    <span class="indicator">+</span>
+                `;
+
+                const messagesContainerDiv = document.createElement('div');
+                messagesContainerDiv.className = 'messages-container';
+
+                messages.forEach((msg, index) => {
+                    if (typeof msg !== 'object' || msg === null || !msg.hasOwnProperty('role') || !msg.hasOwnProperty('content')) {
+                        console.warn(`Skipping invalid message object in chat "${chatId}" at index ${index}:`, msg);
+                        const invalidMsgDiv = document.createElement('div');
+                        invalidMsgDiv.className = 'message';
+                        invalidMsgDiv.style.backgroundColor = '#ffebee'; // Light red
+                        invalidMsgDiv.style.borderLeft = '4px solid #f44336';
+                        // Using textContent, so HTML escaping is handled by the browser
+                        invalidMsgDiv.textContent = `Invalid message data at index ${index}: ${JSON.stringify(msg).substring(0,100)}...`;
+                        messagesContainerDiv.appendChild(invalidMsgDiv);
+                        return; // Skip this message
+                    }
+
+                    const messageDiv = document.createElement('div');
+                    // WARNING: Potential class name injection if role contains spaces/quotes
+                    messageDiv.className = `message ${msg.role?.toString() || 'unknown'}`;
+
+                    let content = msg.content;
+                    let timestampStr = '';
+
+                    const timeRegex = /\[Time: (.*?GMT.*?)\]\s*/;
+                    if (typeof content === 'string') {
+                        const match = content.match(timeRegex);
+                        if (match) {
+                            // WARNING: XSS VULNERABILITY if match[1] (timestamp) contains HTML/script
+                            timestampStr = `<span class="timestamp">${match[1]}</span>`;
+                            content = content.replace(timeRegex, '').trim();
+                        }
+                    } else {
+                        // If content is not a string (e.g., object, array), stringify it
+                        content = JSON.stringify(content);
+                    }
+                    
+                    // WARNING: XSS VULNERABILITY if role or content (or timestampStr) contains HTML/script
+                    messageDiv.innerHTML = `
+                        ${timestampStr}
+                        <span class="role">${msg.role?.toString().charAt(0).toUpperCase() + msg.role?.toString().slice(1) || 'Unknown Role'}:</span>
+                        ${content}
+                    `;
+                    messagesContainerDiv.appendChild(messageDiv);
+                });
+
+                chatHeaderDiv.addEventListener('click', () => {
+                    const isExpanded = chatItemDiv.classList.toggle('expanded');
+                    chatHeaderDiv.classList.toggle('expanded');
+                    const indicator = chatHeaderDiv.querySelector('.indicator');
+                    indicator.textContent = isExpanded ? '−' : '+';
+                });
+
+                chatItemDiv.appendChild(chatHeaderDiv);
+                chatItemDiv.appendChild(messagesContainerDiv);
+                chatListDiv.appendChild(chatItemDiv);
+            }
+        }
+
+        // escapeHtml function has been removed.
+    </script>
+
+</body>
+</html>

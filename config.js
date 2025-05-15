@@ -50,6 +50,34 @@ const config = {
   ),
   TIMEZONE: process.env.TIMEZONE || "UTC",
 
+  // Proactive Messaging Configuration
+  ENABLE_PROACTIVE_MESSAGING:
+    (process.env.ENABLE_PROACTIVE_MESSAGING || "false") === "true",
+  PROACTIVE_TARGETS: process.env.PROACTIVE_TARGETS
+    ? process.env.PROACTIVE_TARGETS.split(",")
+    : [],
+  PROACTIVE_MIN_INTERVAL: parseInt(
+    process.env.PROACTIVE_MIN_INTERVAL || "60",
+    10
+  ), // Minutes
+  PROACTIVE_MAX_INTERVAL: parseInt(
+    process.env.PROACTIVE_MAX_INTERVAL || "240",
+    10
+  ), // Minutes
+  PROACTIVE_CHANCE: parseFloat(process.env.PROACTIVE_CHANCE || "0.3"), // 0-1 probability
+  PROACTIVE_SYSTEM_PROMPT:
+    process.env.PROACTIVE_SYSTEM_PROMPT ||
+    "You are initiating a conversation with the user. Start with something engaging or interesting. Keep it brief and friendly.",
+  PROACTIVE_FALLBACK_MESSAGES: process.env.PROACTIVE_FALLBACK_MESSAGES
+    ? process.env.PROACTIVE_FALLBACK_MESSAGES.split("|")
+    : [
+        "Hey there! How's your day going?",
+        "Just checking in. Anything you'd like to chat about?",
+        "I was just thinking about something interesting. Want to hear about it?",
+        "Do you have a moment to chat?",
+        "Any exciting plans coming up that you'd like to share?",
+      ],
+
   // Persistence
   HISTORY_FILE: process.env.HISTORY_FILE || "./conversationHistory.json",
   SAVE_INTERVAL_MS: parseInt(process.env.SAVE_INTERVAL_MS || "300000", 10), // 5 minutes
@@ -87,6 +115,14 @@ const config = {
     if (!this.TARGET_CHANNEL_ID) {
       console.warn(
         "Warning: TARGET_CHANNEL_ID is not set. Bot will respond in all channels it can see."
+      );
+    }
+    if (
+      this.ENABLE_PROACTIVE_MESSAGING &&
+      this.PROACTIVE_TARGETS.length === 0
+    ) {
+      console.warn(
+        "Warning: ENABLE_PROACTIVE_MESSAGING is true but no PROACTIVE_TARGETS are set. Proactive messaging will not function."
       );
     }
   },

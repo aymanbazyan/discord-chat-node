@@ -6,11 +6,18 @@ const config = require("./config"); // Ensure config is loaded first
 const logger = require("./src/logger"); // Then logger
 const { client, login: discordLogin } = require("./src/discordClient");
 const historyManager = require("./src/utils/historyManager"); // For shutdown hook
+const proactiveMessaging = require("./src/utils/proactiveMessaging"); // For shutdown hook
 
 // --- Graceful Shutdown ---
 const shutdown = (signal) => {
   logger.log(`Received ${signal}. Shutting down gracefully...`);
+
+  // Stop periodic timers and services
   historyManager.stopPeriodicSave(); // Stop interval timer
+  if (config.ENABLE_PROACTIVE_MESSAGING) {
+    proactiveMessaging.stopProactiveMessaging(); // Stop proactive messaging
+  }
+
   logger.log("Attempting to save final history...");
   historyManager.saveHistory(); // Ensure history is saved before exiting
 

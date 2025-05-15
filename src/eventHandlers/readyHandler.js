@@ -5,6 +5,8 @@ const { Events } = require("discord.js");
 const logger = require("../logger");
 const historyManager = require("../utils/historyManager");
 const aiServiceProvider = require("../aiServiceProvider");
+const proactiveMessaging = require("../utils/proactiveMessaging");
+const config = require("../../config");
 
 module.exports = {
   name: Events.ClientReady,
@@ -32,6 +34,14 @@ module.exports = {
 
     // Start periodic saving of history
     historyManager.startPeriodicSave();
+
+    // Initialize proactive messaging system if enabled
+    if (config.ENABLE_PROACTIVE_MESSAGING) {
+      logger.info("Initializing proactive messaging system...");
+      proactiveMessaging.startProactiveMessaging(client);
+    } else {
+      logger.debug("Proactive messaging is disabled in configuration.");
+    }
 
     // You can add other setup tasks here, like setting bot activity
     client.user.setActivity("for messages", { type: "WATCHING" }); // Example activity
