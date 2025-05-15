@@ -7,6 +7,10 @@ const logger = require("./src/logger"); // Then logger
 const { client, login: discordLogin } = require("./src/discordClient");
 const historyManager = require("./src/utils/historyManager"); // For shutdown hook
 const proactiveMessaging = require("./src/utils/proactiveMessaging"); // For shutdown hook
+const aiServiceProvider = require("./src/aiServiceProvider");
+const readyHandler = require("./src/eventHandlers/readyHandler");
+const messageCreateHandler = require("./src/eventHandlers/messageCreateHandler");
+const userInfoManager = require("./src/utils/userInfoManager");
 
 // --- Graceful Shutdown ---
 const shutdown = (signal) => {
@@ -80,6 +84,28 @@ try {
   logger.error("Error registering event handlers:", error);
   process.exit(1);
 }
+
+// Initialize the AI service provider
+if (!aiServiceProvider.initialize()) {
+  logger.error(
+    `Failed to initialize the AI Service Provider (${config.AI_SERVICE}). Shutting down.`
+  );
+  process.exit(1);
+}
+
+// Initialize the history manager
+try {
+  historyManager.loadHistory();
+  historyManager.startPeriodicSave();
+  logger.log("History manager initialized successfully");
+} catch (error) {
+  logger.error("Failed to initialize the History Manager:", error);
+  process.exit(1);
+}
+
+// Ensure usersInfo.json file exists before startup
+userInfoManager.ensureFileExists();
+logger.log("Ensured usersInfo.json file exists");
 
 // --- Start the Bot ---
 logger.log("Starting bot...");

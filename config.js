@@ -86,7 +86,7 @@ const config = {
   HISTORY_FILE_PATH: path.resolve(
     __dirname,
     "./",
-    process.env.HISTORY_FILE || "conversationHistory.json"
+    process.env.HISTORY_FILE || "./data/conversationHistory.json"
   ), // Adjusted path
 
   // Validations (Basic)

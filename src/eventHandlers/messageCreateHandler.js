@@ -9,6 +9,7 @@ const aiServiceProvider = require("../aiServiceProvider");
 const historyManager = require("../utils/historyManager");
 const messageUtils = require("../utils/messageUtils");
 const commandHandler = require("../commands/commandHandler");
+const userInfoManager = require("../utils/userInfoManager");
 
 // Cooldown management
 const userCooldowns = new Set();
@@ -35,6 +36,24 @@ module.exports = {
         `Ignoring direct message from ${message.author.tag} - DMs are disabled.`
       );
       return;
+    }
+
+    // For DMs, reload user info to ensure we have the latest data
+    if (isDM) {
+      // Only reload if it's not an input command to avoid duplicate processing
+      if (
+        !message.content.startsWith(`${config.COMMAND_PREFIX} input`) &&
+        !message.content.startsWith(`${config.COMMAND_PREFIX}input`)
+      ) {
+        logger.log(
+          `Reloading user info for DM from ${message.author.tag} (ID: ${message.author.id})`
+        );
+        userInfoManager.reloadUserInfo();
+      } else {
+        logger.log(
+          `Skipping reload for input command from ${message.author.tag}`
+        );
+      }
     }
 
     // --- 1. Command Handling ---
@@ -228,6 +247,28 @@ module.exports = {
         userMessageForHistory = `[Direct Message] ${userMessageForHistory}`;
       }
 
+      // For DMs, check if user info is complete before proceeding with AI
+      if (isDM) {
+        const userId = message.author.id;
+        if (!userInfoManager.isUserInfoComplete(userId)) {
+          logger.log(
+            `User ${userId} has incomplete info. Redirecting to input command instead of AI.`
+          );
+          await message.channel.send(
+            `Before we can chat, pls use the \`${
+              config.COMMAND_PREFIX
+            } input\` command with the following required fields: ${userInfoManager
+              .getRequiredFields()
+              .join(", ")}`
+          );
+          return; // Stop processing - don't send to AI or save to history
+        }
+
+        logger.log(
+          `User ${userId} has complete info. Proceeding with AI chat.`
+        );
+      }
+
       // Prepare messages for AI Service
       let messagesForOllama = [];
       const currentChannelHistory = historyManager.getChannelHistory(channelId);
@@ -261,11 +302,45 @@ module.exports = {
       logger.debug(
         `Sending ${messagesForOllama.length} message segments to AI service.`
       );
-      const aiResponseContent = (
-        await aiServiceProvider.chat(messagesForOllama)
-      ).replaceAll("\n\n", config.MESSAGE_SPLIT_TOKEN);
 
-      if (!aiResponseContent || aiResponseContent.trim() === "") {
+      // Add options for the AI service, including channelId for user identification
+      const aiOptions = {
+        channelId: channelId,
+        temperature: config.AI_TEMPERATURE,
+      };
+
+      // Get the AI response
+      const aiResponse = await aiServiceProvider.chat(
+        messagesForOllama,
+        aiOptions
+      );
+
+      // Check if the response is null before using replaceAll
+      if (!aiResponse) {
+        logger.warn(`AI service returned null for message ID ${message.id}.`);
+
+        // For DM channels, this might be because user info is incomplete
+        if (isDM) {
+          await message.channel.send(
+            `I need some information from you before we can chat. Please use the \`${config.COMMAND_PREFIX} input\` command to provide your details.`
+          );
+        } else {
+          await message.channel.send(
+            "I... I don't have a response for that right now."
+          );
+        }
+
+        // Don't add to history when we get a null response
+        return;
+      }
+
+      // Process the response now that we know it's not null
+      const aiResponseContent = aiResponse.replaceAll(
+        "\n\n",
+        config.MESSAGE_SPLIT_TOKEN
+      );
+
+      if (aiResponseContent.trim() === "") {
         logger.warn(
           `AI service returned an empty or whitespace-only response for message ID ${message.id}.`
         );

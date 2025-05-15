@@ -5,12 +5,21 @@ const config = require("../config");
 const logger = require("./logger");
 const ollamaService = require("./services/ollamaService");
 const geminiService = require("./services/geminiService"); // Placeholder
+const userInfoManager = require("./utils/userInfoManager");
 
 let currentService = null;
 
 const initialize = () => {
   logger.log(`Attempting to initialize AI Service: ${config.AI_SERVICE}`);
   let initializedSuccessfully = false;
+
+  // Initialize user info manager first
+  if (!userInfoManager.initialize()) {
+    logger.warn(
+      "User info manager failed to initialize. Personalization features may not work properly."
+    );
+  }
+
   if (config.AI_SERVICE === "OLLAMA") {
     if (ollamaService.initialize()) {
       currentService = ollamaService;
@@ -43,6 +52,12 @@ const initialize = () => {
   return initializedSuccessfully;
 };
 
+/**
+ * Send messages to the AI service for chat
+ * @param {Array} messages Array of message objects
+ * @param {Object} options Options including channelId
+ * @returns {Promise<string>} AI response
+ */
 const chat = async (messages, options = {}) => {
   if (!currentService || !currentService.isAvailable()) {
     logger.error(
@@ -50,14 +65,30 @@ const chat = async (messages, options = {}) => {
     );
     return null;
   }
-  // Note: `options` might need to be adapted based on the specific service
+
+  // Extract channelId from the original options if available
+  const serviceOptions = { ...options };
+
+  // Add debug logging
+  logger.log(
+    `AIServiceProvider: Chat request with options: ${JSON.stringify({
+      channelId: serviceOptions.channelId,
+      model:
+        options.model ||
+        (config.AI_SERVICE === "OLLAMA"
+          ? config.OLLAMA_MODEL
+          : config.GEMINI_MODEL),
+    })}`
+  );
+
+  // Pass to the appropriate service
   return currentService.chat(
     messages,
     options.model ||
       (config.AI_SERVICE === "OLLAMA"
         ? config.OLLAMA_MODEL
         : config.GEMINI_MODEL),
-    options
+    serviceOptions
   );
 };
 

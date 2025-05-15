@@ -6,6 +6,7 @@ const logger = require("../logger");
 const infoCommand = require("./infoCommand");
 const addHistoryCommand = require("./addHistoryCommand");
 const clearHistoryCommand = require("./clearHistoryCommand");
+const inputCommand = require("./inputCommand");
 const { client } = require("../discordClient"); // For passing client to commands if needed
 
 // A map of command names to their handler functions/modules
@@ -13,6 +14,7 @@ const commands = {
   info: infoCommand,
   addhistory: addHistoryCommand,
   clearhistory: clearHistoryCommand,
+  input: inputCommand,
   // Add more commands here
   // 'help': helpCommand,
 };

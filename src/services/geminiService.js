@@ -8,6 +8,7 @@ const {
 } = require("@google/generative-ai");
 const config = require("../../config"); // Adjust path if necessary
 const logger = require("../logger"); // Adjust path if necessary
+const userInfoManager = require("../utils/userInfoManager");
 
 let genAI;
 let geminiChatModel;
@@ -28,9 +29,11 @@ const initialize = () => {
   }
 
   try {
+    logger.log(`Initializing Gemini API with model: ${config.GEMINI_MODEL}`);
     genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
 
-    // Initialize the chat model
+    // Initialize the chat model with default system instruction
+    // Note: The actual system instruction will be personalized per chat
     geminiChatModel = genAI.getGenerativeModel({
       model: config.GEMINI_MODEL,
       // Default safety settings - adjust as needed
@@ -52,11 +55,23 @@ const initialize = () => {
           threshold: HarmBlockThreshold.BLOCK_NONE,
         },
       ],
-      systemInstruction: config.GEMINI_SYSTEM_INSTRUCTION || undefined, // Pass system instruction here
+      // We'll set personalized system instructions per chat session
     });
     logger.log(
       `Gemini chat client initialized with model: ${config.GEMINI_MODEL}`
     );
+
+    // Log default system instruction (if any)
+    if (config.GEMINI_SYSTEM_INSTRUCTION) {
+      logger.log(
+        `Default system instruction configured: "${config.GEMINI_SYSTEM_INSTRUCTION.substring(
+          0,
+          50
+        )}..."`
+      );
+    } else {
+      logger.log("No default system instruction configured");
+    }
 
     geminiVisionModel = geminiChatModel; // Use the same model if it's vision-capable
 
@@ -68,6 +83,50 @@ const initialize = () => {
 };
 
 const isAvailable = () => !!genAI && !!geminiChatModel;
+
+/**
+ * Personalizes the system instruction with user info
+ * @param {string} userId Discord user ID
+ * @returns {string} Personalized system instruction
+ */
+const getPersonalizedSystemInstruction = (userId) => {
+  logger.log(`Personalizing system instruction for user: ${userId}`);
+
+  if (!config.GEMINI_SYSTEM_INSTRUCTION) {
+    logger.log("No system instruction configured, returning undefined");
+    return undefined;
+  }
+
+  // Ensure userId is a string
+  const userIdStr = String(userId);
+  const userInfo = userInfoManager.getUserInfo(userIdStr);
+
+  if (!userInfo) {
+    logger.log(
+      `No user info found for ${userIdStr}, returning default instruction`
+    );
+    return config.GEMINI_SYSTEM_INSTRUCTION;
+  }
+
+  logger.log(`Found user info: ${JSON.stringify(userInfo)}`);
+  let instruction = config.GEMINI_SYSTEM_INSTRUCTION;
+
+  // Replace placeholders with user info
+  Object.keys(userInfo).forEach((field) => {
+    const placeholder = `<${field}>`;
+    const value = userInfo[field] || "";
+
+    // Log each replacement
+    logger.log(`Replacing placeholder "${placeholder}" with "${value}"`);
+
+    // Use a global regex to replace all instances of the placeholder
+    const regex = new RegExp(placeholder, "g");
+    instruction = instruction.replace(regex, value);
+  });
+
+  logger.log(`Personalized instruction: "${instruction.substring(0, 50)}..."`);
+  return instruction;
+};
 
 /**
  * Transforms the bot's generic message history to Gemini's format.
@@ -137,6 +196,69 @@ const chat = async (messages, modelName, options = {}) => {
     return null;
   }
 
+  // Extract user ID from the channel ID, which is formatted as "dm_userId"
+  // This assumes the message is from a DM channel with the format our bot uses
+  let userId = null;
+  if (options.channelId) {
+    logger.log(
+      `Gemini: Processing request with channelId: "${options.channelId}"`
+    );
+
+    const channelIdMatch = options.channelId.match(/^dm_(\d+)$/);
+    if (channelIdMatch && channelIdMatch[1]) {
+      userId = channelIdMatch[1];
+      logger.log(`Gemini: Extracted user ID from channel ID: "${userId}"`);
+
+      // Convert possible numeric ID to string for consistency
+      userId = String(userId);
+
+      // Log for debugging
+      logger.log(`Gemini: Processing request for user ID: ${userId}`);
+
+      // Check if user info exists and is complete
+      const userExists = userInfoManager.getUserInfo(userId) !== null;
+      logger.log(`Gemini: User exists in database? ${userExists}`);
+
+      const isComplete = userInfoManager.isUserInfoComplete(userId);
+      logger.log(`Gemini: User info complete? ${isComplete}`);
+
+      // If we have a user ID and user info isn't complete, return instructions instead of processing
+      if (!isComplete) {
+        const missingFields = userInfoManager.getMissingFields(userId);
+        logger.log(
+          `Gemini: User ${userId} has incomplete info. Missing fields: ${missingFields.join(
+            ", "
+          )}`
+        );
+
+        let commandPrefix = require("../../config").COMMAND_PREFIX;
+
+        return (
+          `Before we can chat, pls provide the following:${config.MESSAGE_SPLIT_TOKEN}` +
+          `${missingFields
+            .map(
+              (field) =>
+                `- ${field}: Use \`${commandPrefix} input ${field} your_${field}\``
+            )
+            .join("\n")}${config.MESSAGE_SPLIT_TOKEN}` +
+          `pls.`
+        );
+      }
+
+      // Log the user info for debugging
+      const userInfo = userInfoManager.getUserInfo(userId);
+      logger.log(
+        `Gemini: User ${userId} info is complete: ${JSON.stringify(userInfo)}`
+      );
+    } else {
+      logger.log(
+        `Gemini: Could not extract user ID from channel ID: "${options.channelId}"`
+      );
+    }
+  } else {
+    logger.log("Gemini: No channelId provided in options");
+  }
+
   // The last message in `messages` is the current user's turn.
   const currentUserMessage = messages[messages.length - 1];
   // The history is all messages *before* the current user's turn.
@@ -155,17 +277,91 @@ const chat = async (messages, modelName, options = {}) => {
   );
 
   try {
-    // Start a chat session with history
-    const chatSession = geminiChatModel.startChat({
+    // Get personalized system instruction if user ID is available
+    const systemInstruction = userId
+      ? getPersonalizedSystemInstruction(userId)
+      : config.GEMINI_SYSTEM_INSTRUCTION;
+
+    logger.debug(
+      `Using ${
+        userId ? "personalized" : "default"
+      } system instruction for Gemini chat.`
+    );
+
+    // For Gemini 1.5 models and later, the system instruction format is different
+    // For newer models it may need to be passed as a regular message with role 'system'
+    const modelIsGemini2x =
+      config.GEMINI_MODEL &&
+      (config.GEMINI_MODEL.includes("gemini-2") ||
+        config.GEMINI_MODEL.includes("flash-preview"));
+
+    let chatOptions = {
       history: formattedHistory,
       generationConfig: {
-        //maxOutputTokens: 2048, // Adjust as needed
-        temperature: options.temperature || 0.7, // Example, allow override
-        // topP: options.topP,
-        // topK: options.topK,
+        temperature: options.temperature || 0.7,
       },
-      // System instruction is set at model initialization
-    });
+    };
+
+    // Handle system instruction based on model version
+    if (modelIsGemini2x) {
+      // For Gemini 2.x models, we need a different approach
+      // The API doesn't allow system messages at the beginning
+      // Instead, we'll append the system instruction to the first user message
+      if (systemInstruction && formattedHistory.length > 0) {
+        logger.debug(
+          "For Gemini 2.x: Adding system instruction to the first user message"
+        );
+
+        // Find the first user message
+        for (let i = 0; i < formattedHistory.length; i++) {
+          if (formattedHistory[i].role === "user") {
+            logger.debug(
+              "Found first user message, appending system instruction"
+            );
+
+            // Add the system instruction to the user's message
+            const firstUserMessage = formattedHistory[i];
+            const lastPartIndex = firstUserMessage.parts.length - 1;
+
+            if (lastPartIndex >= 0) {
+              // Add system instruction to the user's message
+              firstUserMessage.parts[
+                lastPartIndex
+              ].text = `[SYSTEM INSTRUCTION: ${systemInstruction}]\n\n${firstUserMessage.parts[lastPartIndex].text}`;
+
+              logger.debug(
+                "Modified first user message with system instruction"
+              );
+            }
+
+            break;
+          }
+        }
+      } else if (systemInstruction && formattedHistory.length === 0) {
+        // If no history but we have a system instruction, add it to the current message
+        logger.debug(
+          "No history, adding system instruction to current user message"
+        );
+
+        // Create a modified version of the current user message with the system instruction
+        const originalContent = currentUserMessage.content;
+        currentUserMessage.content = `[SYSTEM INSTRUCTION: ${systemInstruction}]\n\n${originalContent}`;
+        logger.debug("Modified current user message with system instruction");
+      } else {
+        logger.debug(
+          "No system instruction or no messages to modify for Gemini 2.x"
+        );
+      }
+    } else {
+      // For Gemini 1.x models, use systemInstruction parameter
+      logger.debug(
+        "Using standard systemInstruction parameter for Gemini 1.x model"
+      );
+      chatOptions.systemInstruction = systemInstruction || undefined;
+    }
+
+    // Start a chat session with history and appropriate system instruction format
+    const chatSession = geminiChatModel.startChat(chatOptions);
 
     const result = await chatSession.sendMessage(currentUserMessage.content); // Send only the latest user message content
     const response = result.response;
