@@ -335,10 +335,14 @@ module.exports = {
       }
 
       // Process the response now that we know it's not null
-      const aiResponseContent = aiResponse
-        .replaceAll("\n\n", config.MESSAGE_SPLIT_TOKEN)
-        // Remove single dot (but not double+ dots)
-        .replace(/(?<!\.)\.(?!\.)/g, "");
+      let aiResponseContent = aiResponse.replaceAll(
+        "\n\n",
+        config.MESSAGE_SPLIT_TOKEN
+      );
+
+      // Remove single dot (but not double+ dots)
+      if (config.ALLOW_SINGLE_DOT)
+        aiResponseContent = aiResponseContent.replace(/(?<!\.)\.(?!\.)/g, "");
 
       if (aiResponseContent.trim() === "") {
         logger.warn(

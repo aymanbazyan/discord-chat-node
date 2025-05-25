@@ -26,11 +26,11 @@ module.exports = {
     Ollama Host:           ${config.OLLAMA_HOST}`;
     }
 
-    let geminiInfo = "Gemini Service Not Active";
+    let geminiInfo = "- Service Not Active";
     if (config.AI_SERVICE === "GEMINI") {
       geminiInfo = `
-    Gemini Model:          ${config.GEMINI_MODEL || "Not set"}
-    Gemini API Key Set:    ${config.GEMINI_API_KEY ? "Yes" : "No"}`;
+    - Model:          ${"-" || "Not set"}
+    - API Key Set:    ${config.GEMINI_API_KEY ? "Yes" : "No"}`;
     }
 
     const infoMessage = `\`\`\`
@@ -62,7 +62,7 @@ Max History Size:      ${
         : config.MAX_HISTORY_SIZE
     }
 Multiple Chatters:     ${config.MULTIPLE_CHATTERS}
-ALLOW EMOJIS:     ${config.AI_SERVICE}
+ALLOW EMOJIS:     ${config.ALLOW_EMOJIS}
 ALLOW PRIVATE MESSAGES:     ${config.ALLOW_PRIVATE_MESSAGES}
 System Prompt Set:     ${
       (config.AI_SERVICE === "OLLAMA" && config.OLLAMA_SYSTEM_PROMPT) ||

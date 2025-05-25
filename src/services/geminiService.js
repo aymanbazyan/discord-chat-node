@@ -54,6 +54,14 @@ const initialize = () => {
           category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
           threshold: HarmBlockThreshold.BLOCK_NONE,
         },
+        {
+          category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+          category: HarmCategory.HARM_CATEGORY_UNSPECIFIED,
+          threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
       ],
       // We'll set personalized system instructions per chat session
     });
