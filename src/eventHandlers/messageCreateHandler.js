@@ -341,7 +341,7 @@ module.exports = {
       );
 
       // Remove single dot (but not double+ dots)
-      if (config.ALLOW_SINGLE_DOT)
+      if (!config.ALLOW_SINGLE_DOT)
         aiResponseContent = aiResponseContent.replace(/(?<!\.)\.(?!\.)/g, "");
 
       if (aiResponseContent.trim() === "") {
